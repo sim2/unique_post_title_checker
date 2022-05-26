@@ -1,0 +1,75 @@
+//NEW Plugin: Adding a catch to "Duplicate" named Post Titles, and asking if to "Use Anyway"
+function disallow_posts_with_same_title($messages) {
+
+    global $post;
+
+    global $wpdb ;
+
+    $title = $post->post_title;
+
+    $post_id = $post->ID ;
+
+    $post_type = $post->post_type;
+
+    $post_type_allowed = array('post','shiur','person','shiur-location');
+
+    if(in_array($post_type, $post_type_allowed) && !empty($title)){
+
+        $wtitlequery = "SELECT * FROM $wpdb->posts WHERE post_status = 'publish' AND post_type = '$post_type' AND post_title = '{$title}' AND ID != {$post_id} " ;
+
+        $wresults = $wpdb->get_results( $wtitlequery) ;
+
+        if ( $wresults ) {
+
+            $check_if_bypass = get_post_meta( $post_id, '_bypass', true );
+
+            if(!isset($_GET['bypass']) && empty( $check_if_bypass )){
+
+            $btn_link = admin_url( "post.php?post=".$post_id."&action=edit&bypass=yes" );
+
+            $btn = '<a class="button button-primary button-large" href="'.$btn_link.'">Use Anyway</a>';
+
+            $link = '<a target="_blank" href="'.esc_url( get_edit_post_link($wresults[0]->ID) ).'">Here</a>';
+
+            $error_message = 'This title is already used. View it '.$link.'  '.$btn;
+
+            add_settings_error('post_has_links', '', $error_message, 'error');
+
+            settings_errors( 'post_has_links' );
+
+            $post->post_status = 'draft';
+
+            wp_update_post($post);
+
+            return;
+
+            }else{
+                $check_if_bypass = get_post_meta( $post_id, '_bypass', true );
+
+                if(empty( $check_if_bypass )){
+
+                    $new_link = '<a href="'.esc_url( get_permalink($post_id) ).'">View post</a>';
+
+                    $success_message = 'Post published. '.$new_link;
+
+                    add_settings_error('post_has_links', '', $success_message, 'success');
+
+                    settings_errors( 'post_has_links' );
+
+                    $post->post_status = 'publish';
+
+                    wp_update_post($post);
+
+                    update_post_meta( $post_id, '_bypass', 'yes' );
+
+                    return;
+                }    
+            }
+        }
+    }    
+
+    return $messages;
+
+}
+
+add_action('post_updated_messages', 'disallow_posts_with_same_title'); 
